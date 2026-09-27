@@ -1,6 +1,8 @@
 from fastapi import FastAPI,HTTPException,status
 from scalar_fastapi import get_scalar_api_reference
 from typing import Callable,Any
+from schemas import Shipment
+from enum import Enum
 
 shipments = {
     12701 : {
@@ -36,6 +38,11 @@ shipments = {
 }
 app=FastAPI()
 
+class ShipmentStatus(str,Enum):
+    placed="placed"
+    in_transit="in transit"
+    out_for_delivery="out for delivery"
+
 @app.get("/shipment/latest")
 def get_latest_shipment() -> dict[str,Any]:
     id=max(shipments.keys())
@@ -55,23 +62,34 @@ def get_shipment_id(id:int | None=None)->dict[str,Any]:
     return shipments[id]
 
 @app.post("/shipment")
-def submit_response(data: dict[str,Any]) -> dict[str,Any]:
-    content = data["content"]
-    weight = data["weight"]
-
-    if weight > 25:
-        raise HTTPException(
-            status_code=status.HTTP_406_NOT_ACCEPTABLE,
-            detail="weight > 25"
-        ) 
+def submit_response(shipment:Shipment) -> dict[str,Any]:
+    # content = data["content"]
+    # weight = data["weight"]
+    #below validation not required after pydanctic validation
+    # if weight > 25:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_406_NOT_ACCEPTABLE,
+    #         detail="weight > 25"
+    #     ) 
     new_id = max(shipments.keys())+1
     shipments[new_id]={
-        "weight":weight,
-        "content":content,
+        "weight":shipment.weight,
+        "content":shipment.content,
         "status":"placed"
     }
     return {"id": new_id}
 
+@app.patch("/shipment")
+def update_shipment(id: int,body:dict[str,ShipmentStatus]) -> dict[str,Any]:
+    shipments[id].update(body)
+    return shipments[id]
+
+@app.delete("/shipment")
+def delete_shipment(id:int)->dict[str,str]:
+    shipments.pop(id)
+    return{
+        "detail":f"shipment with {id} deleted"
+    }
 @app.get("/scalar",include_in_schema=False)
 def get_scalar_docs(): 
     return get_scalar_api_reference(
