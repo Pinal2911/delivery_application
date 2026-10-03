@@ -1,47 +1,11 @@
 from fastapi import FastAPI,HTTPException,status
 from scalar_fastapi import get_scalar_api_reference
 from typing import Callable,Any
-from schemas import Shipment
-from enum import Enum
+from schemas import ShipmentCreate,ShipmentRead,ShipmentUpdate
+from database import shipments,save
 
-shipments = {
-    12701 : {
-        "weight": .6,
-        "content":"glassware",
-        "status":"placed"
-    },
-    12702 : {
-        "weight": 1.2,
-        "content":"books",
-        "status":"in transit"
-    },
-    12703 : {
-        "weight": 2.5,
-        "content":"furniture",
-        "status":"delivered"
-    },
-    12704 : {
-        "weight": 0.8,
-        "content":"electronics",
-        "status":"packed"
-    },
-    12705 : {
-        "weight": 3.1,
-        "content":"appliances",
-        "status":"out for delivery"
-    },
-    12706 : {
-        "weight": 0.4,
-        "content":"clothing",
-        "status":"placed"
-    },
-}
 app=FastAPI()
 
-class ShipmentStatus(str,Enum):
-    placed="placed"
-    in_transit="in transit"
-    out_for_delivery="out for delivery"
 
 @app.get("/shipment/latest")
 def get_latest_shipment() -> dict[str,Any]:
@@ -49,8 +13,8 @@ def get_latest_shipment() -> dict[str,Any]:
     return shipments[id]
 
 
-@app.get("/shipment")
-def get_shipment_id(id:int | None=None)->dict[str,Any]:
+@app.get("/shipment",response_model=ShipmentRead)
+def get_shipment_id(id:int):
     # if not id:
     #         id=max(shipments.keys())
     #         return shipments[id]
@@ -61,8 +25,8 @@ def get_shipment_id(id:int | None=None)->dict[str,Any]:
          )
     return shipments[id]
 
-@app.post("/shipment")
-def submit_response(shipment:Shipment) -> dict[str,Any]:
+@app.post("/shipment",response_model=None)
+def submit_response(shipment:ShipmentCreate) -> dict[str,Any]:
     # content = data["content"]
     # weight = data["weight"]
     #below validation not required after pydanctic validation
@@ -73,15 +37,16 @@ def submit_response(shipment:Shipment) -> dict[str,Any]:
     #     ) 
     new_id = max(shipments.keys())+1
     shipments[new_id]={
-        "weight":shipment.weight,
-        "content":shipment.content,
+        **shipment.model_dump(),
         "status":"placed"
     }
+    save()
     return {"id": new_id}
 
-@app.patch("/shipment")
-def update_shipment(id: int,body:dict[str,ShipmentStatus]) -> dict[str,Any]:
+@app.patch("/shipment",response_model=ShipmentUpdate)
+def update_shipment(id: int,body:dict[str,ShipmentUpdate]):
     shipments[id].update(body)
+    save()
     return shipments[id]
 
 @app.delete("/shipment")
@@ -101,7 +66,7 @@ def get_scalar_docs():
 #below api is for just reference/example, not part of application
 
 @app.get("/shipment/{field}")
-def get_shipment_field(field:str,id:int) -> dict[str,Any]:
+def get_shipment_field(field:str,id:int) -> dict[Any,Any]:
     return {
         field:shipments[id][field]
     }
