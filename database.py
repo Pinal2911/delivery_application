@@ -1,69 +1,99 @@
 import sqlite3
+from schemas import ShipmentCreate,ShipmentUpdate
+from typing import Any
+from contextlib import contextmanager
 
-#make connection
-connection=sqlite3.connect("sqlite.db")
-#cursor to execute queries
-cursor=connection.cursor()
+class Database:
+    def connect_to_db(self):
+        #make connection
+        self.conn=sqlite3.connect("sqlite.db",check_same_thread=False)
+        #cursor to execute queries
+        self.cur=self.conn.cursor()
 
-#1.create table
-
-cursor.execute("""
-               CREATE TABLE IF NOT EXISTS shipment(
-                   id INTEGER PRIMARY KEY,
-                   content TEXT,
-                   weight REAL,
-                   status TEXT
-               )
-"""
+        
+    def create_table(self):
+        #create table
+        self.cur.execute("""
+                    CREATE TABLE IF NOT EXISTS shipment(
+                        id INTEGER PRIMARY KEY,
+                        content TEXT,
+                        weight REAL,
+                        status TEXT
+                    )
+        """
 )
 
-#delete/ drop table
-# cursor.execute("drop table shipment")
-# connection.commit()
+    def create(self,shipment:ShipmentCreate)->int:
+        self.cur.execute("select max(id) from shipment")
+        result=self.cur.fetchone()
+        new_id=result[0]+1
+        
+        #insert value in table
+        self.cur.execute("""
+            insert into shipment
+            values(:id,:content,:weight,:status)
+        """,{
+            "id": new_id,
+            **shipment.model_dump(),
+            "status":"placed",
+        }
+        )
+        
+        self.conn.commit()
+        return new_id
+    def get(self,id:int) -> dict[str,Any]| None:
+        self.cur.execute("""
+            select * from shipment
+            where id=?
+        """,(id,))
+        
+        row=self.cur.fetchone()
+        return {
+            "id":row[0],
+            "content":row[1],
+            "weight":row[2],
+            "status":row[3]
+        } if row else None
+        
+    def update(self,id:int,shipment:ShipmentUpdate) -> dict[str,Any]:
+        self.cur.execute("""
+        UPDATE shipment set status =:status
+        where id = :id
+        """,{
+            "id":id,
+            **shipment.model_dump()
+        }
+        )
+        self.conn.commit()
+        return self.get(id)
+    
+    def delete(self,id:int):
+        self.cur.execute("""
+        
+        delete from shipment where id = ?
+        """,(id,)
+        )
+        
+        self.conn.commit()
+        
+    def close(self):
+        print("...connection closed")
+        self.conn.close()
+        
+@contextmanager
+def managed_db():
+    db=Database()
+    print("enter setup...")
+    db.connect_to_db()
+    db.create_table()
+    
+    yield db
+    
+    print("exit the setup")
+    db.close()
+    
 
-#2.add shipment data
-
-# cursor.execute("""
-#                INSERT INTO shipment VALUES(
-#                    12701,
-#                    'plam tress',
-#                    15.23,
-#                    'placed'
-#                )
-# """
-# )
-
-connection.commit()
-
-#3.read shipment data
-
-cursor.execute("""
-select id,status from shipment
-where content = 'plam tress'
-"""
-)
-result = cursor.fetchall()
-print(result)
-
-#4. update shipment
-# cursor.execute("""
-
-# update shipment set status='in_transit' where id=12703
-# """
-# )
-# connection.commit()
-
-#5. update query parameters
-
-status="placed"
-id=12701
-
-cursor.execute("""
-update shipment set status = :status 
-where id >:id
-""",{"status":status,"id":id}
-)
-connection.commit()
-#close connection
-connection.close()
-
+with managed_db() as db:
+    print(db.get(12701))
+    print(db.get(12703))
+        
