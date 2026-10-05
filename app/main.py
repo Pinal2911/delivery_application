@@ -1,8 +1,8 @@
 from fastapi import FastAPI,HTTPException,status
 from scalar_fastapi import get_scalar_api_reference
 from typing import Callable,Any
-from schemas import ShipmentCreate,ShipmentRead,ShipmentUpdate
-from database import Database
+from app.schemas import ShipmentCreate,ShipmentRead,ShipmentUpdate
+from app.database import Database
 
 db= Database()
 
