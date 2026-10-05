@@ -3,10 +3,18 @@ from scalar_fastapi import get_scalar_api_reference
 from typing import Callable,Any
 from app.schemas import ShipmentCreate,ShipmentRead,ShipmentUpdate
 from app.database import Database
+from app.database.session import create_db_tables
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan_handler(app:FastAPI):
+    create_db_tables()
+    yield
 
 db= Database()
 
 app=FastAPI()
+
 
 
 # @app.get("/shipment/latest")
